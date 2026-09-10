@@ -1,0 +1,131 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusEye - Register</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+        }
+        .register-box {
+            border: 2px solid rgb(42, 1, 1);
+            border-radius: 10px;
+            padding: 30px;
+            background-color: rgb(238, 241, 241);
+            box-shadow: 0px 0px 10px rgb(28, 1, 1);
+            width: 400px;
+        }
+        button {
+            background-color: blue;
+            color: white;
+            width: 100%;
+            padding: 10px;
+            border-radius: 30px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        button:hover { background-color: darkblue; transform: scale(1.02); }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            margin-bottom: 5px;
+        }
+        label { display: block; margin-top: 10px; margin-bottom: 3px; font-weight: bold; }
+        a { color: blue; }
+        .error { color: red; font-size: 14px; }
+        .success { color: green; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="register-box">
+        <form id="registerForm">
+            <h1>CampusEye</h1>
+            <p>Smart Campus Complaint System</p>
+
+            <label>Full Name</label>
+            <input type="text" id="fullName" placeholder="Enter your full name" required>
+
+            <label>College Email</label>
+            <input type="email" id="email" placeholder="Enter your college email" required>
+
+            <label>Roll Number</label>
+            <input type="text" id="rollNumber" placeholder="Enter your roll no." required>
+
+            <label>Department</label>
+            <select id="department" required>
+                <option selected disabled value="">Select Department</option>
+                <option>CSE</option>
+                <option>IT</option>
+                <option>ECE</option>
+                <option>AGRI</option>
+                <option>BIOTECHNOLOGY</option>
+            </select>
+
+            <label>Year</label>
+            <select id="year" required>
+                <option selected disabled value="">Select Year</option>
+                <option>1st</option>
+                <option>2nd</option>
+                <option>3rd</option>
+                <option>4th</option>
+            </select>
+
+            <label>Password</label>
+            <input type="password" id="password" required>
+
+            <label>Confirm Password</label>
+            <input type="password" id="confirmPassword" required>
+
+            <button type="submit">Register</button>
+
+            <p>Already have an account? <a href="login_page.html">Login</a></p>
+            <p id="msg"></p>
+        </form>
+    </div>
+
+    <script src="campus-eye-backend/frontend-api.js"></script>
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fullName = document.getElementById('fullName').value;
+            const email = document.getElementById('email').value;
+            const rollNumber = document.getElementById('rollNumber').value;
+            const department = document.getElementById('department').value;
+            const year = document.getElementById('year').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const msg = document.getElementById('msg');
+
+            if (password !== confirmPassword) {
+                msg.className = 'error';
+                msg.textContent = 'Passwords do not match';
+                return;
+            }
+
+            const res = await apiCall('/register', 'POST', {
+                fullName, email, rollNumber, department, year, password
+            });
+
+            if (res.success) {
+                msg.className = 'success';
+                msg.textContent = 'Registration successful! Redirecting to login...';
+                setTimeout(() => window.location.href = 'login_page.html', 1500);
+            } else {
+                msg.className = 'error';
+                msg.textContent = res.message;
+            }
+        });
+    </script>
+</body>
+</html>

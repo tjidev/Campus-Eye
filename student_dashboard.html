@@ -1,0 +1,144 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusEye - Student Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: whitesmoke;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .dashboard {
+            width: 900px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px gray;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid lightgray;
+            padding: 20px;
+        }
+        .cards {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .card {
+            flex: 1;
+            border: 2px solid lightgray;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: 0.3s;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .card p {
+            font-size: 30px;
+            font-weight: bold;
+            margin-top: 10px;
+            color: rgb(255, 0, 8);
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px gray;
+        }
+        .summary { margin-top: 40px; }
+        .summary h2 { text-align: center; margin-bottom: 20px; }
+        .actions { margin-top: 30px; }
+        .actions h2 { margin-bottom: 20px; text-align: center; }
+        .actions button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: none;
+            border-radius: 8px;
+            background-color: royalblue;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .actions button:hover {
+            transform: scale(1.02);
+            background-color: darkblue;
+        }
+        .logout-btn {
+            background-color: crimson !important;
+        }
+        .logout-btn:hover {
+            background-color: darkred !important;
+        }
+        .user-info {
+            text-align: center;
+            color: #555;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>CampusEye</h1>
+            <p id="welcomeMsg">Welcome back!</p>
+            <p class="user-info" id="userInfo"></p>
+        </div>
+        <div class="summary">
+            <h2>Complaint Summary</h2>
+            <div class="cards">
+                <div class="card">
+                    <h3>Total Complaints</h3>
+                    <p id="totalCount">0</p>
+                </div>
+                <div class="card">
+                    <h3>Pending</h3>
+                    <p id="pendingCount">0</p>
+                </div>
+                <div class="card">
+                    <h3>Resolved</h3>
+                    <p id="resolvedCount">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="actions">
+            <h2>Quick Actions</h2>
+            <button onclick="location.href='report_complaint_page.html'">➕ Report Complaint</button>
+            <button onclick="location.href='my_complaint_page.html'">📋 My Complaints</button>
+            <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+        </div>
+    </div>
+
+    <script src="campus-eye-backend/frontend-api.js"></script>
+    <script>
+        requireAuth();
+        const user = getUser();
+        requireRole('Student');
+
+        document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + user.fullName + '!';
+        document.getElementById('userInfo').textContent = user.department + ' | ' + user.year + ' Year | ' + user.rollNumber;
+
+        async function loadStats() {
+            const res = await apiCall('/dashboard/student/' + user.id);
+            if (res.success) {
+                document.getElementById('totalCount').textContent = res.stats.total;
+                document.getElementById('pendingCount').textContent = res.stats.pending;
+                document.getElementById('resolvedCount').textContent = res.stats.resolved;
+            }
+        }
+        loadStats();
+    </script>
+</body>
+</html>

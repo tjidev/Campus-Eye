@@ -1,0 +1,93 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>CampusEye - Login</title>
+   <style>
+      body {
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         height: 100vh;
+         font-family: Arial, sans-serif;
+         background: #f0f2f5;
+      }
+      .login-box {
+         border: 1px solid #ccc;
+         padding: 40px;
+         border-radius: 10px;
+         background-color: #f4f4f4;
+         box-shadow: 0px 0px 10px gray;
+         width: 350px;
+      }
+      .box1 {
+         background-color: blue;
+         color: white;
+         padding: 10px;
+         border-radius: 10px;
+         width: 100%;
+         margin-bottom: 15px;
+         border: none;
+         cursor: pointer;
+         font-size: 16px;
+      }
+      .box1:hover { background-color: darkblue; }
+      input, select {
+         width: 100%;
+         padding: 10px;
+         margin-bottom: 10px;
+         border-radius: 8px;
+         border: 1px solid #ccc;
+         box-sizing: border-box;
+      }
+      a { color: blue; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .error { color: red; font-size: 14px; margin-top: 5px; }
+   </style>
+</head>
+<body>
+   <div class="login-box">
+      <h1>CampusEye</h1>
+      <p>Smart Campus Complaint Management</p>
+      <form id="loginForm">
+         <select id="role">
+            <option>Student</option>
+            <option>Admin</option>
+         </select>
+         <input type="email" id="email" placeholder="Enter your college email" required>
+         <input type="password" id="password" placeholder="Enter your password" required>
+         <button class="box1" type="submit">Login</button>
+         <p>Don't have an account? <a href="register.html">Register here</a></p>
+      </form>
+      <p id="msg" class="error"></p>
+   </div>
+
+   <script src="campus-eye-backend/frontend-api.js"></script>
+   <script>
+      // If already logged in, redirect
+      const user = getUser();
+      if (user) {
+         if (user.role === 'Student') window.location.href = 'student_dashboard.html';
+         else window.location.href = 'admin_dashboard.html';
+      }
+
+      document.getElementById('loginForm').addEventListener('submit', async function (e) {
+         e.preventDefault();
+         const role = document.getElementById('role').value;
+         const email = document.getElementById('email').value;
+         const password = document.getElementById('password').value;
+
+         const res = await apiCall('/login', 'POST', { email, password, role });
+
+         if (res.success) {
+            saveUser(res.user);
+            if (res.user.role === 'Student') window.location.href = 'student_dashboard.html';
+            else window.location.href = 'admin_dashboard.html';
+         } else {
+            document.getElementById('msg').textContent = res.message;
+         }
+      });
+   </script>
+</body>
+</html>

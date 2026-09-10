@@ -1,0 +1,152 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusEye - Report Complaint</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: whitesmoke;
+            min-height: 100vh;
+            padding: 40px 20px;
+            font-family: Arial, sans-serif;
+        }
+        .complaint-box {
+            text-align: left;
+            padding: 30px;
+            width: 80%;
+            max-width: 900px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px gray;
+        }
+        input:not([type="file"]), select, textarea {
+            width: 100%;
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 10px;
+            border: 1px solid lightgray;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        .submit {
+            background: #4169e1;
+            color: aliceblue;
+            padding: 12px;
+            width: 100%;
+            border: 1px solid gray;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 16px;
+        }
+        .submit:hover {
+            background-color: blue;
+            transform: translateY(-2px);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .back-btn {
+            background: #555;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .back-btn:hover { background: #333; }
+        .success { color: green; margin-top: 10px; }
+        .error { color: red; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="complaint-box">
+        <button class="back-btn" onclick="location.href='student_dashboard.html'">← Back to Dashboard</button>
+        <div class="header">
+            <h1>CampusEye</h1>
+            <h2>Report Complaint</h2>
+            <p>Help us improve your campus</p>
+        </div>
+        <form id="complaintForm">
+            <label>Complaint Title</label>
+            <input type="text" id="title" placeholder="Enter complaint title" required>
+
+            <label>Category</label>
+            <select id="category" required>
+                <option selected disabled value="">Select Category</option>
+                <option>Electrical</option>
+                <option>Water</option>
+                <option>Cleanliness</option>
+                <option>Internet</option>
+                <option>Hostel</option>
+                <option>Classroom</option>
+            </select>
+
+            <label>Location</label>
+            <select id="location" required>
+                <option selected disabled value="">Choose Location</option>
+                <option>Library</option>
+                <option>Hostel</option>
+                <option>Canteen</option>
+                <option>Classroom</option>
+                <option>Bus Parking</option>
+            </select>
+
+            <label>Description</label>
+            <textarea id="description" rows="5" placeholder="Describe your complaint" required></textarea>
+
+            <label>Priority</label>
+            <select id="priority" required>
+                <option selected disabled value="">Select Priority</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+            </select>
+
+            <label>Upload Image (optional)</label>
+            <input type="file" id="image" accept="image/*">
+
+            <button class="submit" type="submit">Submit Complaint</button>
+            <p id="msg"></p>
+        </form>
+    </div>
+
+    <script src="campus-eye-backend/frontend-api.js"></script>
+    <script>
+        requireAuth();
+        requireRole('Student');
+        const user = getUser();
+
+        document.getElementById('complaintForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const msg = document.getElementById('msg');
+
+            const res = await apiCall('/complaints', 'POST', {
+                title: document.getElementById('title').value,
+                category: document.getElementById('category').value,
+                location: document.getElementById('location').value,
+                description: document.getElementById('description').value,
+                priority: document.getElementById('priority').value,
+                studentId: user.id
+            });
+
+            if (res.success) {
+                msg.className = 'success';
+                msg.textContent = 'Complaint submitted successfully!';
+                document.getElementById('complaintForm').reset();
+                setTimeout(() => location.href = 'my_complaint_page.html', 1500);
+            } else {
+                msg.className = 'error';
+                msg.textContent = res.message;
+            }
+        });
+    </script>
+</body>
+</html>

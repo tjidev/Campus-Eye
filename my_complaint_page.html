@@ -1,0 +1,134 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusEye - My Complaints</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: whitesmoke;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+        }
+        .complaints {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 800px;
+            max-width: 100%;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px gray;
+            padding: 20px;
+        }
+        .complaint-card {
+            border: 2px solid lightgray;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 8px lightgray;
+            transition: 0.3s;
+        }
+        .complaint-card:hover { transform: translateY(-5px); }
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .resolved {
+            background-color: green;
+            color: white;
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .pending {
+            background-color: rgb(230, 10, 10);
+            color: white;
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .progress {
+            background-color: rgb(13, 210, 224);
+            color: white;
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .back-btn {
+            background: #555;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .back-btn:hover { background: #333; }
+        .no-data {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="complaints">
+        <button class="back-btn" onclick="location.href='student_dashboard.html'">← Back to Dashboard</button>
+        <div class="header">
+            <h1>CampusEye</h1>
+            <h2>My Complaints</h2>
+        </div>
+        <div id="complaintsList"></div>
+    </div>
+
+    <script src="campus-eye-backend/frontend-api.js"></script>
+    <script>
+        requireAuth();
+        requireRole('Student');
+        const user = getUser();
+
+        async function loadMyComplaints() {
+            const res = await apiCall('/complaints/student/' + user.id);
+            const container = document.getElementById('complaintsList');
+
+            if (!res.success || res.complaints.length === 0) {
+                container.innerHTML = '<p class="no-data">No complaints yet. Report one!</p>';
+                return;
+            }
+
+            container.innerHTML = res.complaints.map(c => {
+                let statusClass = 'pending';
+                if (c.status === 'resolved') statusClass = 'resolved';
+                if (c.status === 'in progress') statusClass = 'progress';
+                return `
+                <div class="complaint-card">
+                    <div class="top">
+                        <h3>${c.title}</h3>
+                    </div>
+                    <p><strong>Category:</strong> ${c.category}</p>
+                    <p><strong>Location:</strong> ${c.location}</p>
+                    <p><strong>Priority:</strong> ${c.priority}</p>
+                    <p><strong>Description:</strong> ${c.description}</p>
+                    <p><strong>Status:</strong> <span class="${statusClass}">${c.status}</span></p>
+                    <p><strong>Date:</strong> ${c.date}</p>
+                </div>`;
+            }).join('');
+        }
+
+        loadMyComplaints();
+    </script>
+</body>
+</html>
