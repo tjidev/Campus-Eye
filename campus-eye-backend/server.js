@@ -1,58 +1,116 @@
 // ============================================
-// CampusEye Backend - Simple Express Server
-// For local use only (in-memory storage)
+// CampusEye Backend - SQLite-backed Express Server
 // ============================================
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
 const PORT = 3000;
+const db = new sqlite3.Database(path.join(__dirname, 'campus-eye.db'));
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../'))); // Serve frontend files
 
-// ============================================
-// IN-MEMORY DATABASE (resets on restart)
-// ============================================
-let users = [];
-let complaints = [];
-let nextUserId = 1;
-let nextComplaintId = 1;
-
-// Pre-load a demo admin
-users.push({
-  id: 0,
-  fullName: 'Admin User',
-  email: 'admin@college.edu',
-  rollNumber: 'ADMIN001',
-  department: 'Administration',
-  year: 'N/A',
-  password: 'admin123',
-  role: 'Admin'
-});
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-function findUserByEmail(email) {
-  return users.find(u => u.email.toLowerCase() === email.toLowerCase());
+function runQuery(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve({ id: this.lastID, changes: this.changes });
+    });
+  });
 }
 
-function findUserById(id) {
-  return users.find(u => u.id === id);
+function getQuery(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(row || null);
+    });
+  });
 }
 
-function getComplaintsByStudent(studentId) {
-  return complaints.filter(c => c.studentId === studentId);
+function allQuery(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(rows || []);
+    });
+  });
 }
 
-function getComplaintCounts(studentId = null) {
-  const list = studentId ? getComplaintsByStudent(studentId) : complaints;
+async function initializeDatabase() {
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fullName TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      rollNumber TEXT NOT NULL,
+      department TEXT NOT NULL,
+      year TEXT NOT NULL,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('Student', 'Admin'))
+    )
+  `);
+
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS complaints (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL,
+      location TEXT NOT NULL,
+      description TEXT NOT NULL,
+      priority TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      studentId INTEGER NOT NULL,
+      studentName TEXT NOT NULL,
+      date TEXT NOT NULL,
+      image TEXT,
+      FOREIGN KEY(studentId) REFERENCES users(id)
+    )
+  `);
+
+  const adminExists = await getQuery('SELECT id FROM users WHERE email = ?', ['admin@college.edu']);
+  if (!adminExists) {
+    await runQuery(
+      `INSERT INTO users (fullName, email, rollNumber, department, year, password, role)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ['Admin User', 'admin@college.edu', 'ADMIN001', 'Administration', 'N/A', 'admin123', 'Admin']
+    );
+  }
+}
+
+async function findUserByEmail(email) {
+  return getQuery('SELECT * FROM users WHERE LOWER(email) = LOWER(?)', [email]);
+}
+
+async function findUserById(id) {
+  return getQuery('SELECT * FROM users WHERE id = ?', [id]);
+}
+
+async function getComplaintsByStudent(studentId) {
+  return allQuery('SELECT * FROM complaints WHERE studentId = ? ORDER BY id DESC', [studentId]);
+}
+
+async function getAllComplaints() {
+  return allQuery('SELECT * FROM complaints ORDER BY id DESC');
+}
+
+async function getComplaintCounts(studentId = null) {
+  const list = studentId ? await getComplaintsByStudent(studentId) : await getAllComplaints();
   return {
     total: list.length,
     pending: list.filter(c => c.status === 'pending').length,
@@ -66,51 +124,45 @@ function getComplaintCounts(studentId = null) {
 // ============================================
 
 // POST /api/register - Register a new student
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   const { fullName, email, rollNumber, department, year, password } = req.body;
 
   if (!fullName || !email || !rollNumber || !department || !year || !password) {
     return res.status(400).json({ success: false, message: 'All fields are required' });
   }
 
-  if (findUserByEmail(email)) {
+  const existingUser = await findUserByEmail(email);
+  if (existingUser) {
     return res.status(400).json({ success: false, message: 'Email already registered' });
   }
 
-  const newUser = {
-    id: nextUserId++,
-    fullName,
-    email,
-    rollNumber,
-    department,
-    year,
-    password,
-    role: 'Student'
-  };
-
-  users.push(newUser);
+  const result = await runQuery(
+    `INSERT INTO users (fullName, email, rollNumber, department, year, password, role)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [fullName, email, rollNumber, department, year, password, 'Student']
+  );
 
   res.json({
     success: true,
     message: 'Registration successful',
     user: {
-      id: newUser.id,
-      fullName: newUser.fullName,
-      email: newUser.email,
-      role: newUser.role
+      id: result.id,
+      fullName,
+      email,
+      role: 'Student'
     }
   });
 });
 
 // POST /api/login - Login user
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { email, password, role } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'Email and password required' });
   }
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
 
   if (!user) {
     return res.status(401).json({ success: false, message: 'User not found' });
@@ -144,20 +196,27 @@ app.post('/api/login', (req, res) => {
 // ============================================
 
 // POST /api/complaints - Submit a new complaint
-app.post('/api/complaints', (req, res) => {
+app.post('/api/complaints', async (req, res) => {
   const { title, category, location, description, priority, studentId } = req.body;
 
   if (!title || !category || !location || !description || !priority || !studentId) {
     return res.status(400).json({ success: false, message: 'All fields are required' });
   }
 
-  const student = findUserById(Number(studentId));
+  const student = await findUserById(Number(studentId));
   if (!student) {
     return res.status(404).json({ success: false, message: 'Student not found' });
   }
 
+  const complaintDate = new Date().toISOString().split('T')[0];
+  const result = await runQuery(
+    `INSERT INTO complaints (title, category, location, description, priority, status, studentId, studentName, date, image)
+     VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, NULL)`,
+    [title, category, location, description, priority, Number(studentId), student.fullName, complaintDate]
+  );
+
   const newComplaint = {
-    id: nextComplaintId++,
+    id: result.id,
     title,
     category,
     location,
@@ -166,11 +225,9 @@ app.post('/api/complaints', (req, res) => {
     status: 'pending',
     studentId: Number(studentId),
     studentName: student.fullName,
-    date: new Date().toISOString().split('T')[0],
+    date: complaintDate,
     image: null
   };
-
-  complaints.push(newComplaint);
 
   res.json({
     success: true,
@@ -180,9 +237,9 @@ app.post('/api/complaints', (req, res) => {
 });
 
 // GET /api/complaints/student/:studentId
-app.get('/api/complaints/student/:studentId', (req, res) => {
+app.get('/api/complaints/student/:studentId', async (req, res) => {
   const studentId = Number(req.params.studentId);
-  const studentComplaints = getComplaintsByStudent(studentId);
+  const studentComplaints = await getComplaintsByStudent(studentId);
 
   res.json({
     success: true,
@@ -191,27 +248,34 @@ app.get('/api/complaints/student/:studentId', (req, res) => {
 });
 
 // GET /api/complaints - Get all complaints (Admin)
-app.get('/api/complaints', (req, res) => {
+app.get('/api/complaints', async (req, res) => {
   const { status, search } = req.query;
-  let result = [...complaints];
+  let sql = 'SELECT * FROM complaints';
+  const params = [];
 
   if (status && status !== 'all') {
-    result = result.filter(c => c.status === status);
+    sql += ' WHERE status = ?';
+    params.push(status);
   }
 
   if (search) {
-    const term = search.toLowerCase();
-    result = result.filter(c =>
-      c.studentName.toLowerCase().includes(term) ||
-      c.title.toLowerCase().includes(term)
-    );
+    const term = `%${String(search).toLowerCase()}%`;
+    if (params.length > 0) {
+      sql += ' AND (LOWER(studentName) LIKE ? OR LOWER(title) LIKE ?)';
+    } else {
+      sql += ' WHERE (LOWER(studentName) LIKE ? OR LOWER(title) LIKE ?)';
+    }
+    params.push(term, term);
   }
 
+  sql += ' ORDER BY id DESC';
+
+  const result = await allQuery(sql, params);
   res.json({ success: true, complaints: result });
 });
 
 // PUT /api/complaints/:id/status - Update status
-app.put('/api/complaints/:id/status', (req, res) => {
+app.put('/api/complaints/:id/status', async (req, res) => {
   const complaintId = Number(req.params.id);
   const { status } = req.body;
 
@@ -220,14 +284,15 @@ app.put('/api/complaints/:id/status', (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid status' });
   }
 
-  const complaint = complaints.find(c => c.id === complaintId);
+  const complaint = await getQuery('SELECT * FROM complaints WHERE id = ?', [complaintId]);
   if (!complaint) {
     return res.status(404).json({ success: false, message: 'Complaint not found' });
   }
 
-  complaint.status = status;
+  await runQuery('UPDATE complaints SET status = ? WHERE id = ?', [status, complaintId]);
 
-  res.json({ success: true, message: 'Status updated', complaint });
+  const updatedComplaint = await getQuery('SELECT * FROM complaints WHERE id = ?', [complaintId]);
+  res.json({ success: true, message: 'Status updated', complaint: updatedComplaint });
 });
 
 // ============================================
@@ -235,14 +300,14 @@ app.put('/api/complaints/:id/status', (req, res) => {
 // ============================================
 
 // GET /api/dashboard/student/:studentId
-app.get('/api/dashboard/student/:studentId', (req, res) => {
-  const stats = getComplaintCounts(Number(req.params.studentId));
+app.get('/api/dashboard/student/:studentId', async (req, res) => {
+  const stats = await getComplaintCounts(Number(req.params.studentId));
   res.json({ success: true, stats });
 });
 
 // GET /api/dashboard/admin
-app.get('/api/dashboard/admin', (req, res) => {
-  const stats = getComplaintCounts();
+app.get('/api/dashboard/admin', async (req, res) => {
+  const stats = await getComplaintCounts();
   res.json({ success: true, stats });
 });
 
@@ -250,25 +315,35 @@ app.get('/api/dashboard/admin', (req, res) => {
 // START SERVER
 // ============================================
 
-app.listen(PORT, () => {
-  console.log('============================================');
-  console.log('  CampusEye Backend is running!');
-  console.log('  URL: http://localhost:' + PORT);
-  console.log('============================================');
-  console.log('');
-  console.log('Demo Admin Login:');
-  console.log('  Email: admin@college.edu');
-  console.log('  Password: admin123');
-  console.log('  Role: Admin');
-  console.log('');
-  console.log('API Endpoints:');
-  console.log('  POST /api/register');
-  console.log('  POST /api/login');
-  console.log('  POST /api/complaints');
-  console.log('  GET  /api/complaints/student/:id');
-  console.log('  GET  /api/complaints');
-  console.log('  PUT  /api/complaints/:id/status');
-  console.log('  GET  /api/dashboard/student/:id');
-  console.log('  GET  /api/dashboard/admin');
-  console.log('============================================');
-});
+async function startServer() {
+  try {
+    await initializeDatabase();
+    app.listen(PORT, () => {
+      console.log('============================================');
+      console.log('  CampusEye Backend is running!');
+      console.log('  URL: http://localhost:' + PORT);
+      console.log('============================================');
+      console.log('');
+      console.log('Demo Admin Login:');
+      console.log('  Email: admin@college.edu');
+      console.log('  Password: admin123');
+      console.log('  Role: Admin');
+      console.log('');
+      console.log('API Endpoints:');
+      console.log('  POST /api/register');
+      console.log('  POST /api/login');
+      console.log('  POST /api/complaints');
+      console.log('  GET  /api/complaints/student/:id');
+      console.log('  GET  /api/complaints');
+      console.log('  PUT  /api/complaints/:id/status');
+      console.log('  GET  /api/dashboard/student/:id');
+      console.log('  GET  /api/dashboard/admin');
+      console.log('============================================');
+    });
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
